@@ -32,6 +32,10 @@ jobs:
         run: npm ci
         
       - name: Build
+        env:
+          VITE_QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
+          VITE_QWEN_BASE_URL: ${{ secrets.QWEN_BASE_URL }}
+          VITE_QWEN_MODEL: ${{ secrets.QWEN_MODEL }}
         run: npm run build
         
       - name: Setup Pages

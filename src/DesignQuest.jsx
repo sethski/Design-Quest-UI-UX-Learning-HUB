@@ -326,29 +326,60 @@ async function loadStateLocal() {
   } catch (e) { return null; }
 }
 
-// ─── AI GAME MASTER (NOW VIA BACKEND) ─────────────────────────────────────────
+// ─── AI GAME MASTER (Build-time or backend) ─────────────────────────────────
 async function askGameMaster(userMessage, gameState, context = "general") {
   try {
-    const response = await fetch('http://localhost:3001/api/chat', {
+    const apiKey = import.meta.env.VITE_QWEN_API_KEY;
+    const baseUrl = import.meta.env.VITE_QWEN_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions';
+    const model = import.meta.env.VITE_QWEN_MODEL || 'qwen/qwen-2.5-72b-instruct';
+
+    // Prefer local backend during development
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    if (isLocal) {
+      const response = await fetch('http://localhost:3001/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage, playerName: gameState.playerName || 'Player', context })
+      });
+      if (!response.ok) throw new Error('Backend API error');
+      const data = await response.json();
+      return data.reply;
+    }
+
+    // Production: call OpenRouter directly using build-time Vite env vars
+    if (!apiKey) {
+      throw new Error('Qwen API key not configured (set VITE_QWEN_API_KEY)');
+    }
+
+    const systemPrompt = `You are the GAME MASTER of "Design Quest". Speak like a witty senior designer + RPG dungeon master. Mentoring ${gameState.playerName || 'Player'}.\n\nYOUR PERSONALITY:\n- Direct, no-nonsense, but encouraging\n- Use gaming terminology (XP, quest, level up)\n- Mix design expertise with RPG energy\n- SHORT responses (3-6 sentences). Be punchy.\n- Drop real design wisdom — cite Hick's Law, Fogg's Model, WCAG, Figma\n\nKeep responses under 150 words. Context: ${context}`;
+
+    const response = await fetch(baseUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
       body: JSON.stringify({
-        message: userMessage,
-        playerName: gameState.playerName || "Player",
-        context
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage }
+        ],
+        max_tokens: 300,
+        temperature: 0.8
       })
     });
 
     if (!response.ok) {
-      throw new Error('Backend API error');
+      const errText = await response.text();
+      throw new Error(`API returned ${response.status}: ${errText}`);
     }
 
     const data = await response.json();
-    return data.reply;
+    return data.choices?.[0]?.message?.content || 'The Game Master is thinking...';
   } catch (error) {
     console.error('AI Error:', error);
-    // Fallback response if backend is offline
-    return `🎮 **Game Master is offline.** But you're on the right track! Keep exploring the modules and hands-on exercises. The real learning happens when you build.\n\n_Tip: Make sure the backend server is running (npm run server)_`;
+    return `🎮 **Game Master is offline or unavailable.** Continue studying the modules — the AI will return when configured.`;
   }
 }
 

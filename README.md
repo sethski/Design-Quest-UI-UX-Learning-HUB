@@ -109,7 +109,21 @@ The Game Master uses **Qwen** via **OpenRouter**:
 - **qwen/qwen-2-7b-instruct** - Faster, more economical
 - **qwen/qwen-2.5-coder-32b-instruct** - Specialized for code
 
-Get your OpenRouter API key at https://openrouter.ai/ and configure in `.env`. See [SETUP.md](./SETUP.md) for details.
+Get your OpenRouter API key at https://openrouter.ai/ and configure locally in `.env` for development. For the live site we use GitHub Actions to inject the key at build time via repository secrets.
+
+To enable the AI on the deployed **Live Server** (GitHub Pages), add the following repository secrets in GitHub:
+
+- `QWEN_API_KEY` — your OpenRouter API key
+- `QWEN_BASE_URL` — (optional) API URL, default: `https://openrouter.ai/api/v1/chat/completions`
+- `QWEN_MODEL` — (optional) model name, default: `qwen/qwen-2.5-72b-instruct`
+
+How to add a secret:
+
+1. Go to your repository on GitHub → Settings → Secrets and variables → Actions → New repository secret
+2. Add `QWEN_API_KEY` and the key value
+3. (Optional) add `QWEN_BASE_URL` and `QWEN_MODEL` if you want to override defaults
+
+The GitHub Actions workflow will use these secrets during the build step to bake the API key into the production bundle. Note: exposing an API key client-side is inherently less secure — consider hosting the backend on a secure server and pointing the frontend to that URL if you require stronger protection.
 
 > **The app works without AI!** All study content is built-in. AI provides optional guidance and encouragement.
 
