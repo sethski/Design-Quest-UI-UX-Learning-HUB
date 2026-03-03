@@ -127,6 +127,26 @@ The GitHub Actions workflow will use these secrets during the build step to bake
 
 > **The app works without AI!** All study content is built-in. AI provides optional guidance and encouragement.
 
+## ☁️ Deploy Backend to Render (recommended)
+
+I recommend deploying the backend (`server.js`) to Render so the live site can use the AI Game Master and persistent user progress. The repository includes a `Dockerfile` and `render.yaml` to help.
+
+Quick steps to deploy on Render:
+
+1. Sign in to https://dash.render.com and click **New → Web Service**.
+2. Connect your GitHub repo: `Design-Quest-UI-UX-Learning-HUB`.
+3. For **Branch** select `main`.
+4. Set **Build Command** to `npm ci` and **Start Command** to `npm run server`.
+5. In the Environment section add these environment variables:
+	- `QWEN_API_KEY` — your OpenRouter API key
+	- `QWEN_BASE_URL` — optional (defaults to https://openrouter.ai/api/v1/chat/completions)
+	- `QWEN_MODEL` — optional (defaults to qwen/qwen-2.5-72b-instruct)
+6. Deploy the service. Render will provide a public URL (e.g. `https://design-quest-backend.onrender.com`).
+
+After deployment, set the frontend to call the deployed backend URL (edit `src/DesignQuest.jsx` API endpoints or set a `VITE_BACKEND_URL` env var and rebuild the frontend if needed).
+
+If you'd like, I can prepare a small GitHub Actions workflow to automatically trigger a redeploy on Render via the Render API (requires a Render service token). Let me know if you want that.
+
 ## 🎨 Design Philosophy
 
 Design Quest combines:

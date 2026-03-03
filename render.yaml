@@ -1,0 +1,19 @@
+# Render manifest for Design Quest backend
+# Link this repository in Render and the service will auto-deploy from the `main` branch.
+services:
+  - type: web
+    name: design-quest-backend
+    env: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm run server
+    envVars:
+      # Do NOT store secrets here in the repo. Add these in the Render dashboard as environment variables.
+      - key: QWEN_API_KEY
+        sync: false
+      - key: QWEN_BASE_URL
+        sync: false
+      - key: QWEN_MODEL
+        sync: false

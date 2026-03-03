@@ -1,0 +1,12 @@
+node_modules
+dist
+deploy
+deploy_temp
+.vscode
+.git
+.env
+.env.local
+.env.*.local
+users-data.json
+npm-debug.log*
+.DS_Store
