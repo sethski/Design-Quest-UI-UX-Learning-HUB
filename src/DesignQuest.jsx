@@ -286,14 +286,28 @@ const INITIAL_STATE = {
 
 // ─── SERVER API HELPERS ──────────────────────────────────────────────────────
 async function loginUser(username) {
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   try {
-    const response = await fetch('http://localhost:3001/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username })
-    });
-    const data = await response.json();
-    return data;
+    if (isLocal) {
+      const response = await fetch('http://localhost:3001/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+      const data = await response.json();
+      return data;
+    }
+
+    // Production / static hosting: fallback to localStorage-only auth
+    const saved = await loadStateLocal();
+    if (saved && saved.playerName && saved.playerName.toLowerCase() === username.trim().toLowerCase()) {
+      return { success: true, isNewUser: false, username: saved.playerName, progress: saved };
+    }
+
+    // Create a local-only account and persist to localStorage
+    const initState = { ...INITIAL_STATE, playerName: username.trim() };
+    await saveStateLocal(initState);
+    return { success: true, isNewUser: true, username: username.trim(), progress: initState };
   } catch (error) {
     console.error('Login error:', error);
     throw error;
@@ -301,14 +315,21 @@ async function loginUser(username) {
 }
 
 async function saveProgressToServer(username, progress) {
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   try {
-    const response = await fetch('http://localhost:3001/api/progress/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, progress })
-    });
-    const data = await response.json();
-    return data;
+    if (isLocal) {
+      const response = await fetch('http://localhost:3001/api/progress/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, progress })
+      });
+      const data = await response.json();
+      return data;
+    }
+
+    // Static hosting: persist only to localStorage
+    await saveStateLocal(progress);
+    return { success: true };
   } catch (error) {
     console.error('Save error:', error);
     return null;
