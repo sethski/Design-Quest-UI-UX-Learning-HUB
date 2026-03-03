@@ -2,7 +2,11 @@
 
 **Master UI/UX Design · Level Up Your Skills**
 
-A gamified UI/UX learning experience with an AI Game Master powered by Claude. Progress through 4 levels, complete modules, tackle real-world quests, and build your design portfolio.
+A gamified UI/UX learning experience with an AI Game Master powered by Qwen. Progress through 4 levels, complete modules, tackle real-world quests, and build your design portfolio.
+
+## 🌐 [Live Server](https://sethski.github.io/Design-Quest-UI-UX-Learning-HUB/)
+
+Try it now at: **[https://sethski.github.io/Design-Quest-UI-UX-Learning-HUB/](https://sethski.github.io/Design-Quest-UI-UX-Learning-HUB/)**
 
 ## ✨ Features
 
@@ -24,8 +28,14 @@ npm install
 
 ### Development
 
+**Run frontend only:**
 ```bash
 npm run dev
+```
+
+**Run both frontend and backend (for AI features):**
+```bash
+npm run dev:all
 ```
 
 Open your browser to `http://localhost:5173`
