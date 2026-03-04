@@ -147,6 +147,18 @@ After deployment, set the frontend to call the deployed backend URL (edit `src/D
 
 If you'd like, I can prepare a small GitHub Actions workflow to automatically trigger a redeploy on Render via the Render API (requires a Render service token). Let me know if you want that.
 
+## Troubleshooting: CSP / Browser Extensions
+
+If you see a browser console warning mentioning `Content Security Policy` or `unsafe-eval` on the GitHub Pages site, it is most commonly caused by a browser extension injecting scripts (e.g. developer tools, accessibility extensions, or other content scripts). These extensions can trigger CSP or eval-related warnings that originate outside this app.
+
+Quick checks:
+
+- Open the site in an Incognito/Private window (extensions disabled) to see if the warning disappears.
+- Disable suspicious extensions (especially ones that interact with pages) and reload.
+- If you control the backend or hosting headers, avoid adding `unsafe-eval` to your CSP — it's insecure.
+
+I added a defensive filter in `src/DesignQuest.jsx` to ignore `postMessage` events from common extension origins and disabled production source maps to reduce eval-like artifacts. If the issue persists after disabling extensions, paste the console output and I will investigate further.
+
 ## 🎨 Design Philosophy
 
 Design Quest combines:

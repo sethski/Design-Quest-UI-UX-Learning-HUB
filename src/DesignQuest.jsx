@@ -433,8 +433,17 @@ export default function DesignQuest() {
       console.error('Unhandled Rejection (captured):', e);
     };
     const onMessage = (ev) => {
-      // Log incoming postMessage events (helps identify extension/service-worker sources)
-      try { console.debug('window.message event:', { origin: ev.origin, data: ev.data, source: ev.source }); } catch (err) { }
+      // Ignore messages from browser extensions (they often inject content scripts)
+      try {
+        const origin = ev.origin || '';
+        if (origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://') || origin.startsWith('safari-extension://') || origin.startsWith('ms-browser-extension://')) {
+          // Silently ignore extension messages — they can trigger CSP/eval warnings we can't control
+          return;
+        }
+
+        // Log incoming postMessage events for non-extension origins
+        console.debug('window.message event:', { origin: ev.origin, data: ev.data });
+      } catch (err) { }
     };
 
     const onError = (errEvent) => {
