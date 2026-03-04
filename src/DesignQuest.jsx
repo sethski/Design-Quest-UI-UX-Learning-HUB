@@ -289,16 +289,21 @@ async function loginUser(username) {
   const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   try {
     if (isLocal) {
-      const response = await fetch('http://localhost:3001/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username })
-      });
-      const data = await response.json();
-      return data;
+      try {
+        const response = await fetch('http://localhost:3001/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username })
+        });
+        const data = await response.json();
+        return data;
+      } catch (err) {
+        // Backend unreachable — fall back to local-only auth
+        console.warn('Local backend unreachable, falling back to localStorage auth', err);
+      }
     }
 
-    // Production / static hosting: fallback to localStorage-only auth
+    // Production / static hosting OR backend unreachable: fallback to localStorage-only auth
     const saved = await loadStateLocal();
     if (saved && saved.playerName && saved.playerName.toLowerCase() === username.trim().toLowerCase()) {
       return { success: true, isNewUser: false, username: saved.playerName, progress: saved };
@@ -318,13 +323,19 @@ async function saveProgressToServer(username, progress) {
   const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   try {
     if (isLocal) {
-      const response = await fetch('http://localhost:3001/api/progress/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, progress })
-      });
-      const data = await response.json();
-      return data;
+      try {
+        const response = await fetch('http://localhost:3001/api/progress/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, progress })
+        });
+        const data = await response.json();
+        return data;
+      } catch (err) {
+        console.warn('Save to local backend failed — saving to localStorage instead', err);
+        await saveStateLocal(progress);
+        return { success: true, offline: true };
+      }
     }
 
     // Static hosting: persist only to localStorage
@@ -415,6 +426,30 @@ export default function DesignQuest() {
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
   const saveTimeoutRef = useRef(null);
+
+  // Debugging helpers: capture unhandled promise rejections and window messages
+  useEffect(() => {
+    const onUnhandled = (e) => {
+      console.error('Unhandled Rejection (captured):', e);
+    };
+    const onMessage = (ev) => {
+      // Log incoming postMessage events (helps identify extension/service-worker sources)
+      try { console.debug('window.message event:', { origin: ev.origin, data: ev.data, source: ev.source }); } catch (err) { }
+    };
+
+    const onError = (errEvent) => {
+      try { console.error('Window error (captured):', errEvent.message || errEvent); } catch (e) {}
+    };
+
+    window.addEventListener('unhandledrejection', onUnhandled);
+    window.addEventListener('message', onMessage);
+    window.addEventListener('error', onError);
+    return () => {
+      window.removeEventListener('unhandledrejection', onUnhandled);
+      window.removeEventListener('message', onMessage);
+      window.removeEventListener('error', onError);
+    };
+  }, []);
 
   // Load saved state from local storage (fallback)
   useEffect(() => {
@@ -542,12 +577,22 @@ export default function DesignQuest() {
   }, [gs, updateGs, awardXP]);
 
   const startQuest = useCallback((levelId) => {
-    const level = LEVELS.find(l => l.id === levelId);
-    updateGs(prev => ({ 
-      ...prev, 
-      activeView: "quest-practices", 
-      activeQuest: level,
-    }));
+    try {
+      console.log('startQuest called for levelId:', levelId);
+      const level = LEVELS.find(l => l.id === levelId);
+      if (!level) {
+        console.error('startQuest: level not found', levelId);
+        return;
+      }
+      updateGs(prev => ({ 
+        ...prev, 
+        activeView: "quest-practices", 
+        activeQuest: level,
+      }));
+    } catch (err) {
+      console.error('startQuest error:', err);
+      addNotification('Could not start quest. See console for details.', '#ff6b35');
+    }
   }, [updateGs]);
 
   const completeQuest = useCallback(async (levelId) => {
@@ -736,11 +781,14 @@ export default function DesignQuest() {
             </div>
 
             <div style={{ marginBottom: 24 }}>
-              <div style={{ fontFamily: "monospace", fontSize: 10, letterSpacing: 3, color: "#6b6b8a", marginBottom: 10, textTransform: "uppercase" }}>
+              <label htmlFor="dq-username" style={{ fontFamily: "monospace", fontSize: 10, letterSpacing: 3, color: "#6b6b8a", marginBottom: 10, textTransform: "uppercase", display: 'block' }}>
                 Enter your unique username
-              </div>
+              </label>
               <input
                 value={nameInput}
+                id="dq-username"
+                name="username"
+                autoComplete="username"
                 onChange={e => {
                   setNameInput(e.target.value);
                   setLoginError("");
@@ -1762,6 +1810,8 @@ export default function DesignQuest() {
                             type="text"
                             placeholder="Paste Figma, Dribbble, or any link..."
                             value={(gs.practiceSubmissions || {})[practice.id]?.link || ""}
+                            id={`dq-practice-link-${practice.id}`}
+                            name={`practice_link_${practice.id}`}
                             onChange={(e) => {
                               const subs = gs.practiceSubmissions || {};
                               updateGs({ 
@@ -1801,6 +1851,8 @@ export default function DesignQuest() {
                             type="text"
                             placeholder="Paste image URL (from Imgur, etc)..."
                             value={(gs.practiceSubmissions || {})[practice.id]?.image || ""}
+                            id={`dq-practice-image-${practice.id}`}
+                            name={`practice_image_${practice.id}`}
                             onChange={(e) => {
                               const subs = gs.practiceSubmissions || {};
                               updateGs({ 
@@ -2169,10 +2221,13 @@ export default function DesignQuest() {
           <div style={styles.chatInput}>
             <input
               ref={inputRef}
+              id="dq-chat"
+              name="chatMessage"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === "Enter" && sendMessage(input)}
               placeholder="Ask your Game Master anything..."
+              autoComplete="off"
               style={styles.chatTextInput}
             />
             <button onClick={() => sendMessage(input)} disabled={aiLoading || !input.trim()} style={styles.sendBtn}>
