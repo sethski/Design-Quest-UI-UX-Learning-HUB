@@ -296,6 +296,10 @@ async function loginUser(username) {
           body: JSON.stringify({ username })
         });
         const data = await response.json();
+        // Sanitize progress if it exists
+        if (data.success && data.progress) {
+          data.progress = sanitizeGameState(data.progress);
+        }
         return data;
       } catch (err) {
         // Backend unreachable — fall back to local-only auth
@@ -306,7 +310,8 @@ async function loginUser(username) {
     // Production / static hosting OR backend unreachable: fallback to localStorage-only auth
     const saved = await loadStateLocal();
     if (saved && saved.playerName && saved.playerName.toLowerCase() === username.trim().toLowerCase()) {
-      return { success: true, isNewUser: false, username: saved.playerName, progress: saved };
+      const sanitizedProgress = sanitizeGameState(saved);
+      return { success: true, isNewUser: false, username: saved.playerName, progress: sanitizedProgress };
     }
 
     // Create a local-only account and persist to localStorage
@@ -317,6 +322,23 @@ async function loginUser(username) {
     console.error('Login error:', error);
     throw error;
   }
+}
+
+// Helper to sanitize game state and ensure all fields exist with valid values
+function sanitizeGameState(state) {
+  return {
+    ...INITIAL_STATE,
+    ...state,
+    level: Math.max(1, state.level || 1),
+    activeView: state.activeView === "character-select" ? "hub" : (state.activeView || "hub"),
+    completedModules: state.completedModules || [],
+    completedQuests: state.completedQuests || [],
+    completedQuizzes: state.completedQuizzes || [],
+    completedPractices: state.completedPractices || [],
+    practiceSubmissions: state.practiceSubmissions || {},
+    chatHistory: state.chatHistory || [],
+    notifications: [],  // Clear notifications on login
+  };
 }
 
 async function saveProgressToServer(username, progress) {
@@ -467,30 +489,18 @@ export default function DesignQuest() {
       console.log('💾 Loaded state:', saved);
       if (saved && saved.playerName) {
         console.log('👤 Found saved player:', saved.playerName);
-        // Merge with INITIAL_STATE to ensure new fields exist and sanitize values
-        const mergedSaved = { 
-          ...INITIAL_STATE, 
-          ...saved, 
-          level: Math.max(1, saved.level || 1),
-          activeView: saved.activeView || "hub" // Default to hub if invalid
-        };
-        // Try to sync with server
+        // Try to sync with server (loginUser now sanitizes the state)
         loginUser(saved.playerName).then(data => {
           console.log('✅ Server sync result:', data);
           if (data.success && data.progress) {
-            const mergedProgress = { 
-              ...INITIAL_STATE, 
-              ...data.progress, 
-              level: Math.max(1, data.progress.level || 1),
-              activeView: data.progress.activeView || "hub"
-            };
-            setGs(mergedProgress);
+            setGs(data.progress);
           } else {
-            setGs(mergedSaved);
+            // Fallback to sanitized local state
+            setGs(sanitizeGameState(saved));
           }
         }).catch(err => {
           console.warn('⚠️ Server sync failed, using local state:', err);
-          setGs(mergedSaved);
+          setGs(sanitizeGameState(saved));
         }).finally(() => {
           setLoading(false);
         });
@@ -588,21 +598,25 @@ export default function DesignQuest() {
   const startQuest = useCallback((levelId) => {
     try {
       console.log('startQuest called for levelId:', levelId);
+      console.trace();
       const level = LEVELS.find(l => l.id === levelId);
       if (!level) {
         console.error('startQuest: level not found', levelId);
         return;
       }
-      updateGs(prev => ({ 
-        ...prev, 
-        activeView: "quest-practices", 
-        activeQuest: level,
-      }));
+      updateGs(prev => {
+        console.log('startQuest updating state (prev.activeView, prev.activeQuest):', prev.activeView, prev.activeQuest);
+        return ({ 
+          ...prev, 
+          activeView: "quest-practices", 
+          activeQuest: level,
+        });
+      });
     } catch (err) {
       console.error('startQuest error:', err);
       addNotification('Could not start quest. See console for details.', '#ff6b35');
     }
-  }, [updateGs]);
+  }, [updateGs, addNotification]);
 
   const completeQuest = useCallback(async (levelId) => {
     if (gs.completedQuests.includes(levelId)) return;
@@ -1592,7 +1606,7 @@ export default function DesignQuest() {
                     🗺 GET BRIEFING
                   </button>
                   <button
-                    onClick={() => startQuest(level.id)}
+                    onClick={(e) => { console.log('START QUEST button click', { levelId: level.id, activeView: gs.activeView }); console.trace(); startQuest(level.id); }}
                     style={{ ...styles.smallBtn, background: questDone ? `${lc}20` : lc, color: questDone ? lc : "#000", fontWeight: 700, border: "none" }}
                   >
                     {questDone ? `✓ VIEW PRACTICES (+${level.quest.xpReward} XP earned)` : `⚔️ START QUEST (+${level.quest.xpReward} XP)`}

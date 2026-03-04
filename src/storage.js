@@ -18,6 +18,16 @@ export const storage = {
       console.error('Storage get error:', e);
       return null;
     }
+  },
+  
+  async clear() {
+    try {
+      localStorage.clear();
+      return { success: true };
+    } catch (e) {
+      console.error('Storage clear error:', e);
+      return { success: false, error: e };
+    }
   }
 };
 
